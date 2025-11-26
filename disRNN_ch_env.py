@@ -8,34 +8,52 @@ import haiku as hk
 from disentangled_rnns.library import rnn_utils, disrnn, plotting
 
 # === Load your MATLAB data ===
-mat = scipy.io.loadmat('./changing_environment_test.mat')
-x = mat['samp']  # Check keys with print(mat.keys()) if needed
+mat = scipy.io.loadmat('/Users/tosot/Downloads/Data_forAle.mat')
+x = mat['samp']          # samples in degrees
 y = mat['choices']
 nsamps = mat['nsamps']
 dist_lr = mat['dist_lr']
-timesteps = 12
 
-# === Select full-length trials ===
-print("Total number of trials:", len(y))
-full_mask = nsamps==timesteps
-print("Number of full-length trials:", np.sum(full_mask))
+# === Pad variable-length trials, aligning to the last sample ===
+def pad_and_align_to_last(x, nsamps):
+    """
+    Pad each trial with zeros on the left so that the last sample is aligned.
+    Args:
+        x: array (n_trials, max_timesteps)
+        nsamps: array (n_trials, 1) number of valid samples in each trial
+    Returns:
+        padded_x: array (n_trials, max_len) with left-zero padding
+    """
+    n_trials, max_len = x.shape
+    padded = np.zeros_like(x)
+    for i in range(n_trials):
+        n = int(nsamps[i, 0])
+        if n > 0:
+            padded[i, -n:] = x[i, :n]
+    return padded
 
-x = x[full_mask[:,0],:]
-y = y[full_mask[:,0]]
+# Find longest sequence
+timesteps = int(np.max(nsamps))
+print(f"Max number of samples across trials: {timesteps}")
+
+# Pad all trials to equal length, aligned to last sample
+x_padded = pad_and_align_to_last(x, nsamps)
+
+# Use all trials
 N_trials = len(y)
-dist_lr = dist_lr[full_mask[:,0]]
+print("Total number of trials:", N_trials)
+
 dominance = np.mean(dist_lr, axis=1)
-n_left = np.sum(dominance<0.5)
-print(f"left source dominated in {n_left} trials, right in {N_trials-n_left}")
+n_left = np.sum(dominance < 0.5)
+print(f"Left source dominated in {n_left} trials, right in {N_trials - n_left}")
 
-# split X in two observation channels corresponding to the two sources
-obs1 = x * (1-dist_lr) # eliminate source 2 in observation 1
-obs2 = x * dist_lr # eliminate source 1 in observation 2
+# === Create two observation channels: left and right evidence ===
+obs1 = np.clip(-x_padded, 0, None)  # leftward (negative) values only
+obs2 = np.clip(x_padded, 0, None)   # rightward (positive) values only
 
-# Transpose to (timesteps, trials, features)
-obs1 = np.transpose(obs1)
-obs2 = np.transpose(obs2)
-x_reshaped = np.stack((obs1,obs2),axis=2)
+x_reshaped = np.stack((obs1, obs2), axis=2)
+x_reshaped = np.transpose(x_reshaped, (1, 0, 2))  # (timesteps, trials, features)
+
 # Prepare y with shape (timesteps, trials, 1)
 y_repeated = np.tile(y, (1, timesteps))  # (N_trials, timesteps)
 y_reshaped = y_repeated.T[:, :, np.newaxis]  # (timesteps, trials, 1)
@@ -44,7 +62,7 @@ y_reshaped = y_repeated.T[:, :, np.newaxis]  # (timesteps, trials, 1)
 x_names = ['source1', 'source2']
 y_names = ['choice']
 
-# Dataset class expected by disentangled_rnns
+# === Dataset class expected by disentangled_rnns ===
 class MyDataset:
     def __init__(self, x, y, x_names=None, y_names=None, batch_size=16, batch_mode='single'):
         self.x = x
@@ -52,10 +70,10 @@ class MyDataset:
         self.x_names = x_names or []
         self.y_names = y_names or []
         self.x_type = 'float'
-        self.y_type = 'categorical'  # classification task
+        self.y_type = 'categorical'
         self.n_classes = len(np.unique(y))
         self.batch_size = batch_size
-        self.batch_mode = batch_mode  # Must be one of 'single', 'rolling', or 'random'
+        self.batch_mode = batch_mode
 
     def get_all(self):
         return self.x, self.y
@@ -65,10 +83,10 @@ my_dataset = MyDataset(x_reshaped, y_reshaped, x_names, y_names, batch_size=16, 
 # Split dataset: every 2nd trial is eval
 dataset_train, dataset_eval = rnn_utils.split_dataset(my_dataset, 2)
 
-# Configure Disentangled RNN
+# === Configure Disentangled RNN ===
 disrnn_config = disrnn.DisRnnConfig(
-    obs_size=x_reshaped.shape[2],  # 2 features (sources)
-    output_size=2,                 # binary classification
+    obs_size=x_reshaped.shape[2],
+    output_size=2,
     x_names=x_names,
     y_names=y_names,
     latent_size=5,
@@ -84,7 +102,7 @@ disrnn_config = disrnn.DisRnnConfig(
     update_net_latent_penalty=1e-2,
 )
 
-# Initialize network (no training yet)
+# === Initialize network (no training yet) ===
 params, opt_state, losses = rnn_utils.train_network(
     lambda: disrnn.HkDisentangledRNN(disrnn_config),
     dataset_train,
@@ -94,7 +112,7 @@ params, opt_state, losses = rnn_utils.train_network(
     n_steps=0
 )
 
-# Train the network
+# === Train the network ===
 params, opt_state, losses = rnn_utils.train_network(
     lambda: disrnn.HkDisentangledRNN(disrnn_config),
     dataset_train,
@@ -108,17 +126,13 @@ params, opt_state, losses = rnn_utils.train_network(
     do_plot=True,
 )
 
-# Plot bottlenecks and learned rules
+# === Plot bottlenecks and learned rules ===
 _ = plotting.plot_bottlenecks(params, disrnn_config)
 _ = plotting.plot_choice_rule(params, disrnn_config)
 _ = plotting.plot_update_rules(params, disrnn_config)
 
 # === Extract sigma values from params ===
-# The sigma for each latent unit is stored in the update network parameters, usually under 'latent_sigma'
-# Let's locate it safely:
-
 def find_sigma_in_params(params):
-    # Recursively search for any key containing 'sigma' (case insensitive)
     def recursive_search(d):
         if isinstance(d, dict):
             for k, v in d.items():
@@ -135,7 +149,6 @@ sigmas = find_sigma_in_params(params)
 if sigmas is None:
     raise ValueError("Could not find sigma parameters in params dict.")
 sigmas_np = np.array(sigmas).flatten()
-
 print(f"Extracted latent sigmas: {sigmas_np}")
 
 # === Extract and plot latent activity ===
@@ -146,46 +159,69 @@ def forward_latents(x_seq):
 
     for t in range(x_seq.shape[0]):
         _, state = model(x_seq[t], state)
-        latents.append(state)  # state is (trials, latent_size)
+        latents.append(state)  # (trials, latent_size)
 
     latents = jnp.stack(latents, axis=0)  # (timesteps, trials, latent_size)
     return latents
 
-# Transform forward function with Haiku
 forward_latents_t = hk.transform(forward_latents)
-
-# Prepare RNG key
 rng = jax.random.PRNGKey(42)
-
-# Apply the model with trained params to get latent states
 latents = forward_latents_t.apply(params, rng, jnp.array(x_reshaped))
-latents = np.array(latents)  # (timesteps, trials, latent_size)
+latents = np.array(latents)
 
+# === Plot latent activity for trials ending in left/right source ===
+last_source = dist_lr[:, -1].astype(int)
+timesteps, n_trials, latent_size = latents.shape
+right_last_mask = last_source == 1
+left_last_mask = last_source == 0
 
-# === Compute cumulative evidence per trial (total right - left stimulus) ===
-stim_diff = x_reshaped[:, :, 0] - x_reshaped[:, :, 1]  # shape: (timesteps, trials)
-total_evidence_per_trial = np.sum(stim_diff, axis=0)  # shape: (trials,)
+print(f"Trials with right as last source: {np.sum(right_last_mask)}")
+print(f"Trials with left as last source:  {np.sum(left_last_mask)}")
 
-# Split trials into those with more rightward or leftward evidence
+avg_latent_rightlast = np.mean(latents[:, right_last_mask, :], axis=1)
+avg_latent_leftlast  = np.mean(latents[:, left_last_mask, :], axis=1)
+
+plt.figure(figsize=(12, 2.2 * latent_size))
+for li in range(latent_size):
+    plt.subplot(latent_size, 1, li + 1)
+    plt.plot(avg_latent_rightlast[:, li], label='Right-last', linestyle='-')
+    plt.plot(avg_latent_leftlast[:, li], label='Left-last', linestyle='--')
+    plt.title(f'Latent {li} — avg activity (Right-last vs Left-last)')
+    plt.xlabel('Timestep')
+    plt.ylabel('Activity')
+    plt.legend()
+    plt.grid(True)
+plt.tight_layout()
+plt.show(block=False)
+
+# === Plot the most stable latent (lowest sigma) ===
+lowest_sigma_idx = np.argmin(sigmas_np)
+plt.figure(figsize=(8, 4))
+plt.plot(avg_latent_rightlast[:, lowest_sigma_idx], label='Right-last')
+plt.plot(avg_latent_leftlast[:, lowest_sigma_idx], label='Left-last')
+plt.title(f'Latent {lowest_sigma_idx} (σ={sigmas_np[lowest_sigma_idx]:.3f}) — avg by last source')
+plt.xlabel('Timestep')
+plt.ylabel('Activity')
+plt.legend()
+plt.grid(True)
+plt.tight_layout()
+plt.show(block=False)
+
+# === Evidence-based analysis ===
+stim_diff = x_reshaped[:, :, 0] - x_reshaped[:, :, 1]
+total_evidence_per_trial = np.sum(stim_diff, axis=0)
 right_dominant_trials = total_evidence_per_trial > 0
 left_dominant_trials = total_evidence_per_trial < 0
 
 print(f"# Right-dominant trials: {np.sum(right_dominant_trials)}")
 print(f"# Left-dominant trials: {np.sum(left_dominant_trials)}")
 
-# === Find latent with lowest sigma ===
-lowest_sigma_idx = np.argmin(sigmas_np)
-print(f"Latent with lowest sigma: {lowest_sigma_idx} (σ = {sigmas_np[lowest_sigma_idx]:.3f})")
-
-# === Compute average latent activity for that latent ===
-# Shape of latents: (timesteps, trials, latent_size)
 avg_latent_right = np.mean(latents[:, right_dominant_trials, lowest_sigma_idx], axis=1)
 avg_latent_left = np.mean(latents[:, left_dominant_trials, lowest_sigma_idx], axis=1)
 
-# === Plot ===
 plt.figure(figsize=(8, 5))
-plt.plot(avg_latent_right, label='Right-dominant Trials', color='blue')
-plt.plot(avg_latent_left, label='Left-dominant Trials', color='red')
+plt.plot(avg_latent_right, label='Right-dominant', color='blue')
+plt.plot(avg_latent_left, label='Left-dominant', color='red')
 plt.title(f"Average Activity of Latent {lowest_sigma_idx} (σ={sigmas_np[lowest_sigma_idx]:.3f})")
 plt.xlabel("Timestep")
 plt.ylabel("Average Latent Activity")
@@ -194,21 +230,12 @@ plt.grid(True)
 plt.tight_layout()
 plt.show(block=False)
 
-
-
+# === Correlation analysis ===
 def analyze_latent_accumulation_over_time(latents, x_reshaped):
-    """
-    Analyze how well latent units track accumulated stimulus evidence (right - left) over time.
-    """
     timesteps, trials, latent_size = latents.shape
-
-    # Compute cumulative evidence over time: shape (timesteps, trials)
     stimulus_diff = x_reshaped[:, :, 0] - x_reshaped[:, :, 1]
-    cumulative_evidence = np.cumsum(stimulus_diff, axis=0)  # (timesteps, trials)
-
-    # Compute correlation at each timestep between latent and cumulative evidence
+    cumulative_evidence = np.cumsum(stimulus_diff, axis=0)
     correlations_over_time = np.zeros((timesteps, latent_size))
-
     for t in range(timesteps):
         for i in range(latent_size):
             latent_vals = latents[t, :, i]
@@ -218,8 +245,6 @@ def analyze_latent_accumulation_over_time(latents, x_reshaped):
             else:
                 corr = 0.0
             correlations_over_time[t, i] = corr
-
-    # Plot correlation of each latent with cumulative evidence over time
     plt.figure(figsize=(10, 6))
     for i in range(latent_size):
         plt.plot(range(timesteps), correlations_over_time[:, i], label=f'Latent {i}')
@@ -231,18 +256,16 @@ def analyze_latent_accumulation_over_time(latents, x_reshaped):
     plt.grid(True)
     plt.tight_layout()
     plt.show(block=False)
-
     return correlations_over_time
 
 correlations_over_time = analyze_latent_accumulation_over_time(latents, x_reshaped)
 
-# Plot latent activity for a single trial WITH sigma in legend
-trial_idx = 10  # Change to visualize different trials
-num_latents_to_plot = disrnn_config.latent_size
-
+# === Plot latent activity for a single trial ===
+trial_idx = 10
 plt.figure(figsize=(10, 6))
-for latent_idx in range(num_latents_to_plot):
-    plt.plot(latents[:, trial_idx, latent_idx], label=f'Latent {latent_idx} (σ={sigmas_np[latent_idx]:.3f})')
+for latent_idx in range(disrnn_config.latent_size):
+    plt.plot(latents[:, trial_idx, latent_idx],
+             label=f'Latent {latent_idx} (σ={sigmas_np[latent_idx]:.3f})')
 plt.xlabel('Timestep')
 plt.ylabel('Latent Activity')
 plt.title(f'Latent Activity Over Time (Trial {trial_idx})')

@@ -5,11 +5,18 @@ import matplotlib.pyplot as plt
 import jax
 import jax.numpy as jnp
 import haiku as hk
-
+import sys
+import fcntl
 from disentangled_rnns.library import rnn_utils, disrnn, plotting
 
+# Number of trials to use
+trials2use = 0
+if len(sys.argv) > 1:
+  trials2use = int(sys.argv[1])
+
+
 # === Load your MATLAB data ===
-mat = scipy.io.loadmat('/Users/tosot/Desktop/sbj1.mat')
+mat = scipy.io.loadmat('./sbj1.mat')
 Xmat = mat['data']  # Check keys with print(mat.keys()) if needed
 
 # === Extract stimuli and choice columns ===
@@ -27,6 +34,8 @@ stim_left = stim_left[nan_mask]
 choice = choice[nan_mask].astype(int)
 
 N_trials = stim_right.shape[0]
+if trials2use == 0:
+    trials2use = N_trials # if script is called with now argument, use all trials
 timesteps = 10
 features_per_side = 1
 
@@ -64,6 +73,9 @@ class MyDataset:
     def get_all(self):
         return self.x, self.y
 
+idx = np.random.randint(0, N_trials, trials2use)
+x_reshaped = x_reshaped[:,idx,:]
+y_reshaped = y_reshaped[:,idx,:]
 my_dataset = MyDataset(x_reshaped, y_reshaped, x_names, y_names, batch_size=16, batch_mode='single')
 
 # Split dataset: every 2nd trial is eval
@@ -142,6 +154,14 @@ sigmas_np = np.array(sigmas).flatten()
 
 print(f"Extracted latent sigmas: {sigmas_np}")
 
+ssigmas = np.sort(sigmas_np)
+#with open("results.txt", "a") as file:
+#    fcntl.flock(file.fileno(), fcntl.LOCK_EX)
+#    file.write(str(trials2use) + " " + str(ssigmas)[1:-1] + "\n")
+#    fcntl.flock(file.fileno(), fcntl.LOCK_UN)
+#quit()
+
+
 # === Extract and plot latent activity ===
 def forward_latents(x_seq):
     model = disrnn.HkDisentangledRNN(disrnn_config)
@@ -196,7 +216,7 @@ plt.ylabel("Average Latent Activity")
 plt.legend()
 plt.grid(True)
 plt.tight_layout()
-plt.show()
+plt.show(block=False)
 
 
 
@@ -234,7 +254,7 @@ def analyze_latent_accumulation_over_time(latents, x_reshaped):
     plt.legend()
     plt.grid(True)
     plt.tight_layout()
-    plt.show()
+    plt.show(block=False)
 
     return correlations_over_time
 

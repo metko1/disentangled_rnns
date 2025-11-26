@@ -16,7 +16,7 @@ for i in $(seq 1 2); do
   #(out of $SLURM_NPROCS total) on $(hostname -s)" >> results.txt'
   srun python3 disRNN_test.py ${SLURM_ARRAY_TASK_ID} &
   #for n in ${array[@]}; do
-    #srun python3 disRNN_test_trials.py $n &
+    #srun python3 disRNN_test.py $n &
   #done
 done
 wait
