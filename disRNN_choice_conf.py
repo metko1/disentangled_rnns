@@ -40,7 +40,7 @@ x_concat = np.stack([stim_right, stim_left], axis=2)
 x_reshaped = np.transpose(x_concat, (1, 0, 2))  # IMPORTANT FIX HERE
 
 # Prepare y with shape (timesteps, trials, 1)
-y = np.zeros((timesteps, N_trials,1))
+y = np.full((timesteps, N_trials,1), -1)
 y[-1,:,0] = choice
 #y[timesteps-1,:,1] = conf
 #y = np.tile(choice, (timesteps,1))
@@ -50,7 +50,7 @@ y[-1,:,0] = choice
 x_names = ['right', 'left']
 y_names = ['choice'] #, 'confidence']
 
-my_dataset = rnn_utils.DatasetRNN(x_reshaped, y, y_type='categorical',
+my_dataset = rnn_utils.DatasetRNN(x_reshaped, y, y_type='categorical', n_classes=2,
                                   x_names=x_names, y_names=y_names,
                                   batch_size=16, batch_mode='single')
 
@@ -96,7 +96,7 @@ params, opt_state, losses = rnn_utils.train_network(
     opt_state=opt_state,
     opt=optax.adam(1e-3),
     loss_param=1,
-    n_steps=4000,
+    n_steps=3000,
     do_plot=True,
 )
 
