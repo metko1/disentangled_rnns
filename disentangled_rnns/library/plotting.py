@@ -562,9 +562,9 @@ def plot_latent_update(
 
     ax.set_title(observation, fontsize=large)
     ax.set_xlim(-axis_lim, axis_lim)
-    ax.set_ylim(-axis_lim, axis_lim)
+    #ax.set_ylim(-axis_lim, axis_lim)
     ax.set_xlabel("Latent " + str(latent_num) + " Activity", fontsize=medium)
-    ax.set_aspect("equal")
+    #ax.set_aspect("equal")
     ax.tick_params(axis="both", labelsize=small)
 
   return fig

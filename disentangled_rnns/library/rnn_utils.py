@@ -1147,6 +1147,9 @@ def train_network(
   else:
     eval_batch = None
 
+  plt.ion()
+  last_sigmas = params['hk_disentangled_rnn']['choice_net_sigma_params']
+  
   # Train the network!
   for step in range(n_steps):
     random_key, subkey_train, subkey_validation = jax.random.split(
@@ -1176,10 +1179,16 @@ def train_network(
       validation_loss.append(float(l_validation))
       training_loss.append(float(loss))
 
+      current_sigmas = params['hk_disentangled_rnn']['choice_net_sigma_params']
+      sigma_change = np.linalg.norm(current_sigmas-last_sigmas)
+      last_sigmas = current_sigmas
+
       log_str = (
           f'Step {step + 1} of {n_steps}. '
           f'Training Loss: {loss:.2e}. '
-          f'Validation Loss: {l_validation:.2e}'
+          f'Validation Loss: {l_validation:.2e}, '
+          f"Choice sigmas: {params['hk_disentangled_rnn']['choice_net_sigma_params']}, "
+          f"Total sigma change: {sigma_change}"
       )
 
       if report_progress_by == 'wandb' and hasattr(wandb_run, 'log'):
@@ -1205,10 +1214,19 @@ def train_network(
       else:
         warnings.warn(f'Unknown report_progress_by mode: {report_progress_by}')
 
+      plt.semilogy(training_loss, color='black')
+      plt.semilogy(validation_loss, color='tab:red', linestyle='dashed')
+      plt.xlabel('Training Step')
+      plt.ylabel('Mean Loss')
+      plt.legend(('Training Set', 'Validation Set'))
+      plt.title('Loss over Training')
+      plt.show(block=False)
+      plt.pause(0.001)
+
   # If we actually did any training, print final loss and make a nice plot
   if n_steps > 1 and do_plot:
-
-    plt.figure()
+    plt.ioff()
+    #plt.figure()
     plt.semilogy(training_loss, color='black')
     plt.semilogy(validation_loss, color='tab:red', linestyle='dashed')
     plt.xlabel('Training Step')
