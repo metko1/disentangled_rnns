@@ -588,6 +588,24 @@ def split_dataset(
   dataset_eval = subset_dataset(dataset, eval_sessions)
   return dataset_train, dataset_eval
 
+def split_dataset_randomly(
+    dataset: DatasetRNN, eval_fraction: float, rng: np.random.Generator | None = None
+) -> tuple[DatasetRNN, DatasetRNN]:
+  """Split a dataset into train and eval sets by randomly selecting samples."""
+  data = dataset.get_all()
+  xs = data['xs']
+
+  n_sessions = xs.shape[1]
+  train_sessions = np.ones(n_sessions, dtype=bool)
+  if rng is None:
+    rng = np.random.default_rng()
+  eval_indices = rng.choice(n_sessions, size=int(eval_fraction * n_sessions), replace=False)
+  train_sessions[eval_indices] = False
+  eval_sessions = np.logical_not(train_sessions)
+
+  dataset_train = subset_dataset(dataset, train_sessions)
+  dataset_eval = subset_dataset(dataset, eval_sessions)
+  return dataset_train, dataset_eval
 
 def nan_in_dict(d: np.ndarray | dict[str, Any]):
   """Check a nested dict (e.g. RnnParams) for nans."""
