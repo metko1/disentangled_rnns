@@ -607,7 +607,7 @@ def plot_2ab_sessdata(
     if scalars.ndim == 1:
       scalars = np.expand_dims(scalars, 1)
     scalar_names = [f'state {i}' for i in range(scalars.shape[1])]
-    scalar_colors = sns.color_palette('colorblind')
+    scalar_colors = sns.color_palette('Set2')
     ymax = np.max(scalars)
     ymin = np.min(scalars)
     ylabel = 'Agent State'
