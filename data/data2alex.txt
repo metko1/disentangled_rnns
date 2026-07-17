@@ -1,0 +1,5 @@
+Anyway I attach here a new mat file - subj column 24, blocks n is on column 25, session column 26.
+There is also a mat script to count trials for each block/sbj/ses.
+
+* the block number goes to 1 to 7: this is because some subjects missed one block (for different technical reasons) in one session so I ran an extra block on the next session with the same drug to compensate when possible.
+* another detail - the block number here is not ordered according to presentation, is concatenating the 4 neutral and 2 repeating blocks.

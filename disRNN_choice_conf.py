@@ -6,8 +6,9 @@ import jax
 import jax.numpy as jnp
 import haiku as hk
 import sys
-from disentangled_rnns.library import rnn_utils, disrnn, plotting
+from disentangled_rnns.library import rnn_utils, disrnn, plotting#, get_datasets
 
+#ex = get_datasets.get_pclicks_dataset()
 # === Load your MATLAB data ===
 mat = scipy.io.loadmat('./sbj10.mat')
 Xmat = mat['data']  # Check keys with print(mat.keys()) if needed
@@ -34,23 +35,27 @@ timesteps = 10
 features_per_side: int = 1
 
 # Concatenate right and left features: (N_trials, timesteps, 2)
-x_concat = np.stack([stim_right, stim_left], axis=2)
+# x_concat = np.stack([stim_right, stim_left], axis=2)
+
+# Concatenate right and left features and choice from previous trial: (N_trials, timesteps, 2)
+c = np.tile(choice[:,np.newaxis], (1,timesteps))
+x_concat = np.stack([stim_right[1:,:], stim_left[1:,:], c[0:-1,:]])
 
 # Transpose to (timesteps, trials, features)
-x_reshaped = np.transpose(x_concat, (1, 0, 2))  # IMPORTANT FIX HERE
+x_reshaped = np.transpose(x_concat, (2, 1, 0))  # IMPORTANT FIX HERE
 
 # Prepare y with shape (timesteps, trials, 1)
-y = np.full((timesteps, N_trials,1), -1)
-y[-1,:,0] = choice
+y = np.full((timesteps, N_trials-1,1), -1)
+y[-1,:,0] = choice[1:]
 #y[timesteps-1,:,1] = conf
 #y = np.tile(choice, (timesteps,1))
 #y = np.expand_dims(y, axis=2)
 
 # Names
-x_names = ['right', 'left']
+x_names = ['right', 'left', 'prev_choice']
 y_names = ['choice'] #, 'confidence']
 
-my_dataset = rnn_utils.DatasetRNN(x_reshaped, y, y_type='categorical', n_classes=2,
+my_dataset = rnn_utils.DatasetRNN(x_reshaped, y, y_type='categorical',
                                   x_names=x_names, y_names=y_names,
                                   batch_size=16, batch_mode='single')
 
@@ -59,7 +64,8 @@ dataset_train, dataset_eval = rnn_utils.split_dataset(my_dataset, 2)
 
 # Configure Disentangled RNN
 disrnn_config = disrnn.DisRnnConfig(
-    obs_size=x_reshaped.shape[2],  # 2 features (right, left)
+    #obs_size=x_reshaped.shape[2],  # 2 features (right, left)
+    obs_size=x_reshaped.shape[2],  # 3 features (right, left, previous choice)
     output_size=2,                 # binary classification
     x_names=x_names,
     y_names=y_names,

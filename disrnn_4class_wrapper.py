@@ -406,7 +406,7 @@ plt.legend(); plt.grid(True)
 
 plt.tight_layout()
 plt.show()
-
+quit()
 # ------------------------
 # === Latent plotting: average latent trajectories by selected/non-selected × high/low confidence
 # (user requested selected vs non-selected instead of left/right)

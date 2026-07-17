@@ -73,9 +73,9 @@ class MyDataset:
     def get_all(self):
         return self.x, self.y
 
-idx = np.random.randint(0, N_trials, trials2use)
-x_reshaped = x_reshaped[:,idx,:]
-y_reshaped = y_reshaped[:,idx,:]
+#idx = np.random.randint(0, N_trials, trials2use)
+#x_reshaped = x_reshaped[:,idx,:]
+#y_reshaped = y_reshaped[:,idx,:]
 my_dataset = MyDataset(x_reshaped, y_reshaped, x_names, y_names, batch_size=16, batch_mode='single')
 
 # Split dataset: every 2nd trial is eval
@@ -120,7 +120,7 @@ params, opt_state, losses = rnn_utils.train_network(
     opt_state=opt_state,
     opt=optax.adam(1e-3),
     loss_param=1,
-    n_steps=2500,
+    n_steps=4000,
     do_plot=True,
 )
 
@@ -128,7 +128,8 @@ params, opt_state, losses = rnn_utils.train_network(
 _ = plotting.plot_bottlenecks(params, disrnn_config)
 _ = plotting.plot_choice_rule(params, disrnn_config)
 _ = plotting.plot_update_rules(params, disrnn_config)
-
+plt.show()
+quit()
 # === Extract sigma values from params ===
 # The sigma for each latent unit is stored in the update network parameters, usually under 'latent_sigma'
 # Let's locate it safely:
@@ -155,11 +156,13 @@ sigmas_np = np.array(sigmas).flatten()
 print(f"Extracted latent sigmas: {sigmas_np}")
 
 ssigmas = np.sort(sigmas_np)
-#with open("results.txt", "a") as file:
-#    fcntl.flock(file.fileno(), fcntl.LOCK_EX)
-#    file.write(str(trials2use) + " " + str(ssigmas)[1:-1] + "\n")
-#    fcntl.flock(file.fileno(), fcntl.LOCK_UN)
-#quit()
+with open("results.txt", "a") as file:
+    fcntl.flock(file.fileno(), fcntl.LOCK_EX)
+    file.write(str(trials2use) + " " + str(ssigmas)[1:-1] + " " +
+               str(np.mean(losses['training_loss'][-1])) + " " +
+               str(np.mean(losses['validation_loss'][-1])) + "\n")
+    fcntl.flock(file.fileno(), fcntl.LOCK_UN)
+quit()
 
 
 # === Extract and plot latent activity ===

@@ -1,0 +1,11 @@
+all subjects (dimension 20 X 3 - n_subject X n_drugs) - the drug map is 1.Lorazepam, 2.placebo, 3.Memantine.
+0: choice
+1:10: right stim
+11:20: left stim
+21: confidence
+22: delta/generative mean
+23: Reaction time
+24: session
+25: block
+26: transition probability
+27: correctness (0/1)
