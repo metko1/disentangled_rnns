@@ -13,7 +13,7 @@ job-drugs.sh
 job-stability.sh
 notebooks
 Peng
-__pycache__
+__pycache__/
 results-accuracy-alt.txt
 results-sigmas-only.txt
 results-trials.txt
