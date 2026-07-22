@@ -1,5 +1,6 @@
 DisentangledRNN.code-workspace
 datasets.pkl
+disentangled_rnns
 figures
 figures-1output
 figures_choice_conf
@@ -20,5 +21,11 @@ results-trials.txt
 train_neuro_disrnn.py
 train_single_disrnn.py
 choice+feedback+sensory
+choice+feedback+sensory_time
 .directory
+.venv
+.idea
+.vscode/
 cml_early_late.py
+results July 2026.key
+

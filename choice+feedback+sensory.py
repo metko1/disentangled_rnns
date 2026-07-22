@@ -80,10 +80,13 @@ for sub in range(1,21):
       xdelta_mean = delta_mean[selection]
       xdelta_mean = xdelta_mean[1:] # remove first trial because it has no feedback
       if args.sensory_noise is not None:
-        scrambled = np.random.permutation(xdelta_mean)
-        for i in range(len(xdelta_mean)):
-          if np.random.rand() < args.sensory_noise:
-            xdelta_mean[i] = scrambled[i]
+        # Gaussian noise, with standard deviation args.sensory_noise
+        xdelta_mean += np.random.normal(0, args.sensory_noise, size=xdelta_mean.shape)
+        # Noise as random permutation of samples, with probability args.sensory_noise
+        # scrambled = np.random.permutation(xdelta_mean)
+        # for i in range(len(xdelta_mean)):
+        #   if np.random.rand() < args.sensory_noise:
+        #     xdelta_mean[i] = scrambled[i]
       
       xfeedback = feedback[selection]
       xfeedback = xfeedback[:-1] # remove last trial because it has no next trial to predict

@@ -15,7 +15,7 @@ import matplotlib.pyplot as plt
 from disentangled_rnns.library import rnn_utils, disrnn, plotting
 from disentangled_rnns.library import two_armed_bandits
 
-datapath = "choice+feedback+sensory/beta=1e-3_steps=2e4"
+datapath = "choice+feedback+sensory/gaussian_noise=0.2"
 os.makedirs(datapath, exist_ok=True)  # Create directory if it doesn't exist
 with open(datapath+"/params.pkl", "rb") as f:
   config = pickle.load(f)
@@ -29,10 +29,10 @@ with open(datapath+"/datasets.pkl", "rb") as f:
 drug = np.full(repeat.shape, fill_value=2) # dummy drug array since drug info is not available for all trials
 drug_name = ["all drugs", "lorazepam", "placebo", "memantine"]
 
-#plotting.plot_bottlenecks(params, config, sort_latents=False)
-#plotting.plot_choice_rule(params, config)
-plotting.plot_update_rules(params, config, observation_types = [[0,0,0.1],[1,0,0.1],[0,1,0.1],[1,1,0.1],
-                                                                [0,0,-0.1],[1,0,-0.1],[0,1,-0.1],[1,1,-0.1]])
+plotting.plot_bottlenecks(params, config, sort_latents=False)
+plotting.plot_choice_rule(params, config)
+#plotting.plot_update_rules(params, config, observation_types = [[0,0,0.1],[1,0,0.1],[0,1,0.1],[1,1,0.1],
+#                                                                [0,0,-0.1],[1,0,-0.1],[0,1,-0.1],[1,1,-0.1]])
 plt.show(block=True)
 
 latent_sigmas = disrnn.reparameterize_sigma(

@@ -12,9 +12,11 @@
       "console": "integratedTerminal",
       "args": [
         "--beta",
-        "1e-2",
+        "1e-3",
         "--train-steps",
-        "20_000"
+        "200_000",
+        "--result-path",
+        "choice+feedback+sensory_time/beta=1e-3_steps=2e5"
       ]
     },
     {
