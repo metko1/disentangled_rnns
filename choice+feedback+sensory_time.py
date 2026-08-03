@@ -20,15 +20,15 @@ from disentangled_rnns.library import rnn_utils, disrnn, plotting
 parser = argparse.ArgumentParser(description="Fine-tunes disRNN models.")
 parser.add_argument('--result-path', type=str, default=".", help="Path to save results (params, configs).")
 parser.add_argument('--beta', type=float, default=1e-3, help="general penalty")
-#parser.add_argument('--sensory-noise', type=float, default=None, help="sensory noise level")
+parser.add_argument('--sensory-noise', type=float, default=None, help="sensory noise level")
 parser.add_argument('--train-steps', type=int, default=500_000, help="training steps")
 parser.add_argument('--no-plot', action='store_true', help="hide result plots")
 parser.add_argument('--test-trial', type=int, default=None, help="evaluate accuracy on this trial")
 parser.add_argument('--drug-id', type=int, default=2, help="0 all, 1 Lorazepam, 2 placebo, 3 Memantine")
 
 args = parser.parse_args()
-print(f"Training with beta={args.beta}, train_steps={args.train_steps} "
-      #f"sensory-noise={args.sensory_noise}, "
+print(f"Training with beta={args.beta}, train_steps={args.train_steps}, "
+      f"sensory-noise={args.sensory_noise}, "
       f"test_trial={args.test_trial}, no_plot={args.no_plot}, drug_id={args.drug_id}")
 
 # Load data and drug information
@@ -49,7 +49,7 @@ if args.drug_id != 0: # only consider sessions for the specified drug
 # from the previous trial
 stim_right = Xmat[:, 1:11]   # Right stimulus, 10 timesteps per trial
 stim_left = Xmat[:, 11:21]  # Left stimulus, 10 timesteps per trial
-#delta_mean = Xmat[:,22]
+delta_mean = Xmat[:,22]
 feedback = Xmat[:, 27]
 choice = Xmat[:, 0]
 #conf = Xmat[:, 21]
@@ -59,9 +59,10 @@ trans_prob = Xmat[:, 26]
 
 timesteps = 10
 datasets = []
-x = np.empty((1190,0,4)) # input: previous choice, feedback, stim_left, stim_right
+# 11 time steps, 119 trials -> 1309
+x = np.empty((1309,0,4)) # input: previous choice, feedback, stim_left, stim_right
 #x_rep = np.empty((119,0,2))
-y = np.empty((1190,0,1), dtype=int)
+y = np.empty((1309,0,1), dtype=int)
 repeat = np.empty(0, dtype=bool)
 drug_id = np.empty(0, dtype=int)
 
@@ -84,10 +85,16 @@ for sub in range(1,21):
       # Prepare x
       xstim_left = stim_left[selection]
       xstim_left = xstim_left[1:,:] # remove first trial because it has no feedback
+      if args.sensory_noise is not None:
+        xstim_left = xstim_left + np.random.normal(0, args.sensory_noise, size=xstim_left.shape)
+      xstim_left = np.append(xstim_left, np.zeros((xstim_left.shape[0],1)), axis=1) # add a zero to the end of each trial to indicate the end of the trial
       xstim_right = stim_right[selection]
       xstim_right = xstim_right[1:,:] # remove first trial because it has no feedback
-      #xdelta_mean = delta_mean[selection]
-      #xdelta_mean = xdelta_mean[1:] # remove first trial because it has no feedback
+      if args.sensory_noise is not None:
+        xstim_right = xstim_right + np.random.normal(0, args.sensory_noise, size=xstim_right.shape)
+      xstim_right = np.append(xstim_right, np.zeros((xstim_right.shape[0],1)), axis=1) # add a zero to the end of each trial to indicate the end of the trial
+      xdelta_mean = delta_mean[selection]
+      xdelta_mean = xdelta_mean[1:] # remove first trial because it has no feedback
       #if args.sensory_noise is not None:
       #  scrambled = np.random.permutation(xdelta_mean)
       #  for i in range(len(xdelta_mean)):
@@ -97,26 +104,36 @@ for sub in range(1,21):
       xfeedback = feedback[selection]
       xfeedback = xfeedback[:-1] # remove last trial because it has no next trial to predict
       xfeedback_time = np.tile(xfeedback, (timesteps,1)).T
+      xfeedback_time = np.append(xfeedback_time, np.zeros((xfeedback_time.shape[0],1)), axis=1) # add a zero to the end of each trial to indicate the end of the trial
       xchoice = choice[selection].astype(int)
       xchoice = xchoice[:-1] # remove last trial because it has no next trial to predict
       xchoice_time = np.tile(xchoice, (timesteps,1)).T
+      xchoice_time = np.append(xchoice_time, np.zeros((xchoice_time.shape[0],1)), axis=1) # add a zero to the end of each trial to indicate the end of the trial
       row = np.stack([xchoice_time.flatten(), xfeedback_time.flatten(), 
                       xstim_left.flatten(), xstim_right.flatten()], axis=1)
-      if row.shape[0] < 1190:
-        missing = 1190 - row.shape[0]
+      if row.shape[0] < 1309:   
+        missing = 1309 - row.shape[0]
         #print(f"Subject {sub}, session {sess}, block {blk}: {missing} trial(s) missing, padding with zeros")
         row = np.pad(row, ((0, missing), (0, 0)), mode='constant', constant_values=-1)
+
       x = np.append(x, row[:,None,:], axis=1)
+
       # if trans_prob[selection][0] == 0.5: # only consider repetitive trials
       #   x = np.append(x, row[:,None,:], axis=1)
       # else:
       #   x_rep = np.append(x_rep, row[:,None,:], axis=1)
       
-      # Prepare y with shape (trials, 1, 2)
+      # Train to predict subject's choice
       ychoice = choice[selection].astype(int)
       ychoice = ychoice[1:] # remove first trial because it has no feedback
+
+      # Train on task
+      #ychoice = np.array(xdelta_mean>0).astype(int) # 1 if right, 0 if left
+      #ychoice[xdelta_mean==0] = -1
+      
       ychoice_time = np.full_like(xchoice_time, -1)
       ychoice_time[:,-1] = ychoice  
+
       #yconf = conf[selection]
       #yconf = yconf[1:] # remove first trial because it has no feedback
       #row = np.stack([ychoice, yconf], axis=1)

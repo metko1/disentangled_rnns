@@ -16,7 +16,7 @@ from disentangled_rnns.library import rnn_utils, disrnn, plotting
 from disentangled_rnns.library import two_armed_bandits
 
 #datapath = "choice+feedback+sensory/beta=1e-3_steps=2e4_noise=0.6"
-datapath = "choice+feedback+sensory_time/beta=1e-2_steps=2e4"
+datapath = "choice+feedback+sensory_time/task_beta=1e-3_steps=2e5"
 os.makedirs(datapath, exist_ok=True)  # Create directory if it doesn't exist
 with open(datapath+"/params.pkl", "rb") as f:
   config = pickle.load(f)
@@ -32,8 +32,7 @@ drug_name = ["all drugs", "lorazepam", "placebo", "memantine"]
 
 #plotting.plot_bottlenecks(params, config, sort_latents=False)
 #plotting.plot_choice_rule(params, config)
-#plotting.plot_update_rules(params, config, observation_types = [[0,0,0.1],[1,0,0.1],[0,1,0.1],[1,1,0.1],
-#                                                                [0,0,-0.1],[1,0,-0.1],[0,1,-0.1],[1,1,-0.1]])
+#plotting.plot_update_rules(params, config, observation_types = [[0,0,0,0],[0,0,1,0],[0,0,0,1],[0,0,1,1]]) # choice, feedback, stim_left, stim_right 
 #plt.show(block=True)
 
 latent_sigmas = disrnn.reparameterize_sigma(
@@ -82,10 +81,10 @@ print(f"Network accuracy: {network_acc:.3f}")
 
 # Reduce last_choice and last_feedback to one input at the beginning of a trial
 # to better visualize trial limits
-vis_last_choice = np.reshape(last_choice, shape=(10, -1, 241), order='F')
+vis_last_choice = np.reshape(last_choice, shape=(11, -1, 241), order='F')
 vis_last_choice[1:, :, :] = -1
 vis_last_choice = np.reshape(vis_last_choice, shape=(-1,241), order='F')
-vis_last_feedback = np.reshape(last_feedback, shape=(10, -1, 241), order='F')
+vis_last_feedback = np.reshape(last_feedback, shape=(11, -1, 241), order='F')
 vis_last_feedback[1:, :, :] = -1
 vis_last_feedback = np.reshape(vis_last_feedback, shape=(-1, 241), order='F')
 
@@ -98,12 +97,13 @@ for drug_id in np.unique(drug):
          last_choice_session = vis_last_choice[:, example_session]
          last_feedback_session = vis_last_feedback[:, example_session]
          model_choice_session = model_choice[:, example_session,np.newaxis] - 0.5
-         correct_session = correct[:, example_session]
+         #correct_session = correct[:, example_session]
          states = np.squeeze(opt_state[:, example_session, :])
-         input_left = 5 * stim_left[:, example_session, np.newaxis]
-         input_right = 5 * stim_right[:, example_session, np.newaxis]
-         scalars = np.concat((states, input_left, input_right, 
-                              model_choice_session), axis=1)
+         #input_left = 5 * stim_left[:, example_session, np.newaxis]
+         #input_right = 5 * stim_right[:, example_session, np.newaxis]
+         #scalars = np.concat((states, input_left, input_right, 
+         #                     model_choice_session), axis=1)
+         scalars = np.concat((states,model_choice_session),axis=1)
          two_armed_bandits.plot_2ab_sessdata(last_choice_session,
                                           last_feedback_session,
                                           scalars=scalars,
@@ -120,11 +120,12 @@ for drug_id in np.unique(drug):
          last_choice_session = last_choice[:, example_session]
          last_feedback_session = last_feedback[:, example_session]
          model_choice_session = model_choice[:, example_session,np.newaxis] - 0.5
-         correct_session = correct[:, example_session]
+         #correct_session = correct[:, example_session]
          states = np.squeeze(opt_state[:, example_session, :])
          input_left = 5 * stim_left[:, example_session, np.newaxis]
          input_right = 5 * stim_right[:, example_session, np.newaxis]
-         scalars = np.concat((states, input_left, input_right, model_choice_session), axis=1)
+         #scalars = np.concat((states, input_left, input_right, model_choice_session), axis=1)
+         scalars = np.concat((states,model_choice_session),axis=1)
          two_armed_bandits.plot_2ab_sessdata(last_choice_session,
                                           last_feedback_session,
                                           scalars=scalars,

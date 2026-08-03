@@ -25,7 +25,9 @@ choice+feedback+sensory_time
 .directory
 .venv
 .idea
-.vscode/
+.vscode
 cml_early_late.py
 results July 2026.key
+results July 2026.pdf
 
+job-choice+feedback+sensory_time.sh
