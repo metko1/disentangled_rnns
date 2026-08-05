@@ -1,30 +1,33 @@
-# Compiled python modules.
-*.pyc
-
-# Byte-compiled
-_pycache__/
-.cache/
-
-# Poetry, setuptools, PyPI distribution artifacts.
-/*.egg-info
-.eggs/
-build/
-dist/
-poetry.lock
-
-# Tests
-.pytest_cache/
-
-# Type checking
-.pytype/
-
-# Other
-*.DS_Store
-
-# PyCharm
-.idea
-
-# Ignore generated docs
-docs/_build
-docs/api
+DisentangledRNN.code-workspace
+datasets.pkl
+disentangled_rnns
+figures
+figures-1output
+figures_choice_conf
+figures_test
+Figure_1.png
+history
+job-accuracy.sh
+job-choice+feedback+sensory_sensory_noise.sh
+job-choice+feedback+sensory.sh
+job-drugs.sh
+job-stability.sh
+notebooks
+Peng
+__pycache__/
+results-accuracy-alt.txt
+results-sigmas-only.txt
+results-trials.txt
+train_neuro_disrnn.py
+train_single_disrnn.py
+choice+feedback+sensory
+choice+feedback+sensory_time
 .directory
+.idea
+.venv
+.vscode
+cml_early_late.py
+results July 2026.key
+results July 2026.pdf
+
+job-choice+feedback+sensory_time.sh
