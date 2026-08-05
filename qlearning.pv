@@ -1,0 +1,23 @@
+# Run forward pass on the unseen data
+eval_data = dataset_eval.get_all()
+xs_eval, ys_eval = eval_data['xs'], eval_data['ys']
+network_output, network_states = rnn_utils.eval_network(
+    lambda: disrnn.HkDisentangledRNN(disrnn_config_noiseless), params, xs_eval)
+
+# Compute normalized likelihood
+logits = network_output[:,:,:2]  # First n_actions elements of network output are the logits (the final one is the penalty)
+normalized_likelihood = rnn_utils.normalized_likelihood(labels = ys_eval, output_logits=logits)
+
+print(f'Normalized likelihood: {100*normalized_likelihood:.2f}%')
+
+# Plot network activations on an example session
+example_session = 0  # @param {type: "integer"}
+
+choices = xs_eval[:, example_session, 0]
+rewards = xs_eval[:, example_session, 1]
+scalars = network_states[:, example_session, :]
+two_armed_bandits.plot_2ab_sessdata(choices,
+                                    rewards,
+                                    scalars=scalars,
+                                    scalar_types='agent_states',
+                                    show_legend=False)

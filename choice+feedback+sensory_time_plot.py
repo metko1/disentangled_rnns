@@ -1,4 +1,4 @@
-# Plot bottlenecks and time courses of latent variables and outputs from 
+# Plot bottlenecks and time courses of latent variables and outputs from
 # choice+feedback+sensory script
 import copy
 from haiku.pad import valid
@@ -16,7 +16,7 @@ from disentangled_rnns.library import rnn_utils, disrnn, plotting
 from disentangled_rnns.library import two_armed_bandits
 
 #datapath = "choice+feedback+sensory/beta=1e-3_steps=2e4_noise=0.6"
-datapath = "choice+feedback+sensory_time/task_beta=1e-3_steps=2e5"
+datapath = "choice+feedback+sensory_time/task_beta=1e-3_noise=0.4_steps=2e5"
 os.makedirs(datapath, exist_ok=True)  # Create directory if it doesn't exist
 with open(datapath+"/params.pkl", "rb") as f:
   config = pickle.load(f)
@@ -32,7 +32,7 @@ drug_name = ["all drugs", "lorazepam", "placebo", "memantine"]
 
 #plotting.plot_bottlenecks(params, config, sort_latents=False)
 #plotting.plot_choice_rule(params, config)
-#plotting.plot_update_rules(params, config, observation_types = [[0,0,0,0],[0,0,1,0],[0,0,0,1],[0,0,1,1]]) # choice, feedback, stim_left, stim_right 
+#plotting.plot_update_rules(params, config, observation_types = [[0,0,0,0],[0,0,1,0],[0,0,0,1],[0,0,1,1]]) # choice, feedback, stim_left, stim_right
 #plt.show(block=True)
 
 latent_sigmas = disrnn.reparameterize_sigma(
@@ -90,7 +90,7 @@ vis_last_feedback = np.reshape(vis_last_feedback, shape=(-1, 241), order='F')
 
 for drug_id in np.unique(drug):
    drug_mask = drug.flatten() == drug_id
-   non_rep_trials = np.where(~repeat & drug_mask)[0] # take the first non-repetitive session as an example 
+   non_rep_trials = np.where(~repeat & drug_mask)[0] # take the first non-repetitive session as an example
    if non_rep_trials.size > 0:
       for i in range(3):
          example_session = non_rep_trials[i]
@@ -101,7 +101,7 @@ for drug_id in np.unique(drug):
          states = np.squeeze(opt_state[:, example_session, :])
          #input_left = 5 * stim_left[:, example_session, np.newaxis]
          #input_right = 5 * stim_right[:, example_session, np.newaxis]
-         #scalars = np.concat((states, input_left, input_right, 
+         #scalars = np.concat((states, input_left, input_right,
          #                     model_choice_session), axis=1)
          scalars = np.concat((states,model_choice_session),axis=1)
          two_armed_bandits.plot_2ab_sessdata(last_choice_session,
@@ -264,6 +264,3 @@ plt.legend(); plt.grid(True)
 
 plt.tight_layout()
 plt.show()
-
-
-

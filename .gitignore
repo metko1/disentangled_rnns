@@ -23,8 +23,8 @@ train_single_disrnn.py
 choice+feedback+sensory
 choice+feedback+sensory_time
 .directory
-.venv
 .idea
+.venv
 .vscode
 cml_early_late.py
 results July 2026.key
