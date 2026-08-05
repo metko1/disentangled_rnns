@@ -1,10 +1,12 @@
+disentangled_rnns/
+figures/
+figures-1output/
+figures_choice_conf/
+figures_test/
+__pycache__/
+
 DisentangledRNN.code-workspace
 datasets.pkl
-disentangled_rnns
-figures
-figures-1output
-figures_choice_conf
-figures_test
 Figure_1.png
 history
 job-accuracy.sh
@@ -14,7 +16,6 @@ job-drugs.sh
 job-stability.sh
 notebooks
 Peng
-__pycache__/
 results-accuracy-alt.txt
 results-sigmas-only.txt
 results-trials.txt
