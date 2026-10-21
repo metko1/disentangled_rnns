@@ -17,8 +17,8 @@ mat = scipy.io.loadmat('data/All_data_feedback.mat')
 data = mat['All_Data']  # Check keys with print(mat.keys()) if needed
 timesteps = 10
 datasets = []
-x = np.empty((1200,0,2))
-y = np.empty((1200,0,2))
+x = np.empty((1190,0,3))
+y = np.empty((1190,0,2))
 for Xmat in data[:,1]: # placebo
   nan_mask = ~np.isnan(Xmat[:,0])
   Xmat = Xmat[nan_mask]
@@ -134,4 +134,3 @@ two_output_disrnn.plot_choice_rule(params, config)
 two_output_disrnn.plot_confidence_rule(params, config)
 #two_output_disrnn.plot_update_rules(params, disrnn_w_two_output_config)
 plt.show()
-

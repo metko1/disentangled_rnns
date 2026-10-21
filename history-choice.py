@@ -37,7 +37,7 @@ mat = scipy.io.loadmat('data/Drug_id.mat')
 drug = mat['All_Drug']
 drug = drug[nan_mask]
 if args.drug_id != 0: # only consider sessions for the specified drug
-  Xmat = Xmat[drug[:,0] == args.drug_id,:] 
+  Xmat = Xmat[drug[:,0] == args.drug_id,:]
   drug = drug[drug[:,0] == args.drug_id,:].astype(int)
 
 delta_mean = Xmat[:,22]
@@ -64,7 +64,7 @@ for sub in range(1,21):
       if np.sum(selection) < 2: # need at least 2 trials to have a history
         #print(f"No trials in subject {sub}, block {blk}, session {sess}.")
         continue
-      if np.sum(selection) > 120: 
+      if np.sum(selection) > 120:
         print(f"Too many trials ({np.sum(selection)}) for subject {sub} in block {blk} session {sess}, skipping")
         continue
       #if trans_prob[selection][0] == 0.5: # only consider repetitive trials
@@ -169,7 +169,7 @@ if args.result_path:
 
 config = disrnn.DisRnnConfig(
   # Dataset related
-  obs_size=2, 
+  obs_size=2,
   output_size=2,  # choice
   x_names=ds_train.x_names,
   y_names=ds_train.y_names,
@@ -237,4 +237,3 @@ if not args.no_plot:
   plotting.plot_choice_rule(params, config)
   #plotting.plot_update_rules(params, config)
   plt.show()
-

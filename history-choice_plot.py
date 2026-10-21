@@ -12,7 +12,8 @@ import matplotlib.pyplot as plt
 from disentangled_rnns.library import rnn_utils, disrnn, plotting
 from disentangled_rnns.library import two_armed_bandits
 
-datapath = "choice+feedback+sensory/beta=1e-3_steps=2e4/"
+#datapath = "choice+feedback+sensory/beta=1e-3_steps=2e4/"
+datapath = "history/choice+feedback/drug-2/"
 with open(datapath+"/params.pkl", "rb") as f:
   config = pickle.load(f)
   params = pickle.load(f)
@@ -23,13 +24,13 @@ with open(datapath+"/datasets.pkl", "rb") as f:
   dataset_test = pickle.load(f)
   repeat = pickle.load(f)
   #drug = pickle.load(f)
-drug = np.full(repeat.shape, fill_value=2) # dummy drug array since drug info is not available for all trials
-drug_name = ["all drugs", "lorazepam", "placebo", "memantine"]
+#drug = np.full(repeat.shape, fill_value=2) # dummy drug array since drug info is not available for all trials
+#drug_name = ["all drugs", "lorazepam", "placebo", "memantine"]
 
-plotting.plot_bottlenecks(params, config, sort_latents=False)
-plotting.plot_choice_rule(params, config)
+#plotting.plot_bottlenecks(params, config, sort_latents=False)
+#plotting.plot_choice_rule(params, config)
 #plotting.plot_update_rules(params, config)
-plt.show(block=True)
+#plt.show(block=True)
 
 latent_sigmas = disrnn.reparameterize_sigma(
    params['hk_disentangled_rnn']['latent_sigma_params'])
@@ -74,10 +75,10 @@ network_acc = np.mean(network_prediction == next_choice)
 print(f"Network accuracy: {network_acc:.3f}")
 #model_acc = np.mean(network_prediction == subj_choice)
 #print(f"Model accuracy: {model_acc:.3f}")
-
 for drug_id in np.unique(drug):
+
    drug_mask = drug.flatten() == drug_id
-   non_rep_trials = np.where(~repeat & drug_mask)[0] # take the first non-repetitive session as an example 
+   non_rep_trials = np.where(~repeat & drug_mask)[0] # take the first non-repetitive session as an example
    if non_rep_trials.size > 0:
       for i in range(3):
          example_session = non_rep_trials[i]
@@ -232,6 +233,3 @@ plt.legend(); plt.grid(True)
 
 plt.tight_layout()
 plt.show()
-
-
-
