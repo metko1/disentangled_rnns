@@ -592,6 +592,24 @@ def split_dataset(
   dataset_eval = subset_dataset(dataset, eval_sessions)
   return dataset_train, dataset_eval
 
+def split_dataset_randomly(
+    dataset: DatasetRNN, eval_fraction: float, rng: np.random.Generator | None = None
+) -> tuple[DatasetRNN, DatasetRNN]:
+  """Split a dataset into train and eval sets by randomly selecting samples."""
+  data = dataset.get_all()
+  xs = data['xs']
+
+  n_sessions = xs.shape[1]
+  train_sessions = np.ones(n_sessions, dtype=bool)
+  if rng is None:
+    rng = np.random.default_rng()
+  eval_indices = rng.choice(n_sessions, size=int(eval_fraction * n_sessions), replace=False)
+  train_sessions[eval_indices] = False
+  eval_sessions = np.logical_not(train_sessions)
+
+  dataset_train = subset_dataset(dataset, train_sessions)
+  dataset_eval = subset_dataset(dataset, eval_sessions)
+  return dataset_train, dataset_eval
 
 def nan_in_dict(d: np.ndarray | dict[str, Any]):
   """Check a nested dict (e.g. RnnParams) for nans."""
@@ -678,7 +696,48 @@ def categorical_neg_log_likelihood(
   masked_log_liks = jnp.where(mask, log_liks, 0.0)
   loss = -jnp.sum(masked_log_liks)
   n_unmasked_samples = jnp.sum(mask)
-  return loss, n_unmasked_samples  # pyrefly: ignore[bad-return]
+  return loss, n_unmasked_samples  # pytype: disable=bad-return-type  # jnp-type
+
+@jax.jit
+def categorical_neg_log_likelihood2(
+    labels: np.ndarray, output_logits: np.ndarray
+) -> float:
+  """Compute total log-likelihood of a set of labels given a set of logits."""
+  """Variant for two categorical outputs"""
+  # Mask any errors for which label is negative
+  mask = jnp.logical_not(labels < 0)
+  shape = output_logits.shape
+  # reshape output into pairs of binaries
+  reshaped_output_logits = jnp.reshape(output_logits, (shape[0], shape[1], 2, 2))
+  #jax.debug.breakpoint()
+  #jax.debug.print("output_logits {x}", x=output_logits[0,0,:])
+  #jax.debug.print("reshaped_output_logits {x}", x=reshaped_output_logits[0,0,:,:])
+  log_probs = jax.nn.log_softmax(reshaped_output_logits, axis=3)
+  #log_probs = jax.nn.log_softmax(output_logits[:,:,0:2])
+  #jax.debug.print("log_probs {x}", x= log_probs[0,0,:,:])
+  #if labels.shape[2] != 1:
+  #  raise ValueError(
+  #      'Categorical loss function requires targets to be of dimensionality'
+  #      ' (n_timesteps, n_episodes, 1)'
+  #  )
+  #one_hot_labels = jax.nn.one_hot(
+  #    labels[:, :, 0], num_classes=output_logits.shape[-1]
+  #)
+  one_hot_labels = jax.nn.one_hot(labels, num_classes=2, axis=3)
+  #one_hot_labels = jax.nn.one_hot(labels[:, :, 0], num_classes=2)
+  #jax.debug.print("one_hot_labels [9,0,:,:] {x}", x=one_hot_labels[9, 0, :, :])
+  #jax.debug.print("one_hot_labels [9,4,:,:] {x}", x=one_hot_labels[9, 4, :, :])
+  log_liks = one_hot_labels * log_probs
+  m = jnp.stack([mask, mask],axis=3) # extend mask for one-hot encoding
+  #jax.debug.print("m[9,0,:,:] {x}", x=m[9, 0, :, :])
+  #jax.debug.print("m[9,4,:,:] {x}", x=m[9, 4, :, :])
+  #masked_log_liks = jnp.where(mask, log_liks, 0.0)
+  masked_log_liks = jnp.where(m, log_liks, 0.0)
+  #jax.debug.print("masked_log_liks[9,0,:,:] {x}", x=masked_log_liks[9, 0, :, :])
+  #jax.debug.print("masked_log_liks[9,4,:,:] {x}", x=masked_log_liks[9, 4, :, :])
+  loss = -jnp.sum(masked_log_liks)
+  n_unmasked_samples = jnp.sum(mask)
+  return loss, n_unmasked_samples  # pytype: disable=bad-return-type  # jnp-type
 
 
 def likelihood_and_sse(
@@ -925,6 +984,7 @@ def train_network(
         'penalized_mse',
         'categorical',
         'penalized_categorical',
+        'penalized_categorical2',
         'hybrid',
         'penalized_hybrid',
     ] = 'mse',
@@ -958,7 +1018,7 @@ def train_network(
       {'penalty_scale': 0.1, 'likelihood_weight': 0.8}) or a single float for
       simpler losses.
     loss: The loss function to use. Options are 'mse', 'penalized_mse',
-      'categorical', 'penalized_categorical', 'hybrid', 'penalized_hybrid',
+      'categorical', 'penalized_categorical', 'penalized_categorical2', 'hybrid', 'penalized_hybrid',
       'penalized_log_hybrid'.
     log_losses_every: How many training steps between each time we check for
       errors and log the loss.
@@ -1071,6 +1131,23 @@ def train_network(
     loss = avg_nll + penalty_scale * avg_penalty
     return loss
 
+  def penalized_categorical_loss2(
+      params, batch, random_key, loss_param=loss_param_dict
+  ) -> float:
+    """Two categorical outputs, treats the last element of the model outputs as a penalty."""
+    # (n_steps, n_episodes, n_targets)
+    model_output = model.apply(params, random_key, batch['xs'])
+    output_logits = model_output[:, :, :-1]
+    penalty = compute_penalty(model_output)
+    nll, n_unmasked_samples = categorical_neg_log_likelihood2(
+        batch['ys'], output_logits
+    )
+    penalty_scale = get_loss_param(loss_param, 'penalty_scale', 1.0)
+    avg_nll = nll / n_unmasked_samples
+    avg_penalty = penalty / n_unmasked_samples
+    loss = avg_nll + penalty_scale * avg_penalty
+    return loss
+
   def hybrid_loss(
       params, batch, random_key, loss_param=loss_param_dict
   ) -> float:
@@ -1123,6 +1200,7 @@ def train_network(
       'penalized_mse': penalized_mse_loss,
       'categorical': categorical_loss,
       'penalized_categorical': penalized_categorical_loss,
+      'penalized_categorical2': penalized_categorical_loss2,
       'hybrid': hybrid_loss,
       'penalized_hybrid': penalized_hybrid_loss,
   }
@@ -1156,6 +1234,9 @@ def train_network(
   else:
     eval_batch = None
 
+  plt.ion()
+  last_sigmas = jnp.exp(params['hk_two_output_disentangled_rnn']['choice_net_log_sigmas']) # in v 0.20, reparameterize_sigmas is just jnp.exp()
+
   # Train the network!
   for step in range(n_steps):
     random_key, subkey_train, subkey_validation = jax.random.split(
@@ -1185,10 +1266,17 @@ def train_network(
       validation_loss.append(float(l_validation))
       training_loss.append(float(loss))
 
+      # Calculate the change in sigmas
+      current_sigmas = jnp.exp(params['hk_two_output_disentangled_rnn']['choice_net_log_sigmas']) # in v 0.20, reparameterize_sigmas is just jnp.exp()
+      sigma_change = np.linalg.norm(current_sigmas-last_sigmas)
+      last_sigmas = current_sigmas
+
       log_str = (
           f'Step {step + 1} of {n_steps}. '
           f'Training Loss: {loss:.2e}. '
-          f'Validation Loss: {l_validation:.2e}'
+          f'Validation Loss: {l_validation:.2e}, '
+          f"Choice sigmas: {params['hk_two_output_disentangled_rnn']['choice_net_log_sigmas']}, "
+          f"Total sigma change: {sigma_change}"
       )
 
       if report_progress_by == 'wandb' and hasattr(wandb_run, 'log'):
@@ -1214,10 +1302,19 @@ def train_network(
       else:
         warnings.warn(f'Unknown report_progress_by mode: {report_progress_by}')
 
+      plt.semilogy(training_loss, color='black')
+      plt.semilogy(validation_loss, color='tab:red', linestyle='dashed')
+      plt.xlabel('Training Step')
+      plt.ylabel('Mean Loss')
+      plt.legend(('Training Set', 'Validation Set'))
+      plt.title('Loss over Training')
+      plt.show(block=False)
+      plt.pause(0.001)
+
   # If we actually did any training, print final loss and make a nice plot
   if n_steps > 1 and do_plot:
-
-    plt.figure()
+    plt.ioff()
+    #plt.figure()
     plt.semilogy(training_loss, color='black')
     plt.semilogy(validation_loss, color='tab:red', linestyle='dashed')
     plt.xlabel('Training Step')
