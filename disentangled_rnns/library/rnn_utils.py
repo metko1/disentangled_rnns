@@ -1275,7 +1275,7 @@ def train_network(
           f'Step {step + 1} of {n_steps}. '
           f'Training Loss: {loss:.2e}. '
           f'Validation Loss: {l_validation:.2e}, '
-          f"Choice sigmas: {params['hk_two_output_disentangled_rnn']['choice_net_log_sigmas']}, "
+          f"Choice sigmas: {jnp.exp(params['hk_two_output_disentangled_rnn']['choice_net_log_sigmas'])}, "
           f"Total sigma change: {sigma_change}"
       )
 
