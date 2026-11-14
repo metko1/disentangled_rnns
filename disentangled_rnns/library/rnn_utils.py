@@ -696,7 +696,6 @@ def categorical_neg_log_likelihood(
   masked_log_liks = jnp.where(mask, log_liks, 0.0)
   loss = -jnp.sum(masked_log_liks)
   n_unmasked_samples = jnp.sum(mask)
-  return loss, n_unmasked_samples  # pyrefly: ignore[bad-return]
   return loss, n_unmasked_samples  # pytype: disable=bad-return-type  # jnp-type
 
 @jax.jit
@@ -1139,7 +1138,7 @@ def train_network(
     # (n_steps, n_episodes, n_targets)
     model_output = model.apply(params, random_key, batch['xs'])
     output_logits = model_output[:, :, :-1]
-    penalty, _ = compute_penalty(batch['ys'], model_output)
+    penalty = compute_penalty(model_output)
     nll, n_unmasked_samples = categorical_neg_log_likelihood2(
         batch['ys'], output_logits
     )
@@ -1201,6 +1200,7 @@ def train_network(
       'penalized_mse': penalized_mse_loss,
       'categorical': categorical_loss,
       'penalized_categorical': penalized_categorical_loss,
+      'penalized_categorical2': penalized_categorical_loss2,
       'hybrid': hybrid_loss,
       'penalized_hybrid': penalized_hybrid_loss,
   }
@@ -1235,7 +1235,7 @@ def train_network(
     eval_batch = None
 
   plt.ion()
-  last_sigmas = params['hk_two_output_disentangled_rnn']['choice_net_sigma_params']
+  last_sigmas = jnp.exp(params['hk_two_output_disentangled_rnn']['choice_net_log_sigmas']) # in v 0.20, reparameterize_sigmas is just jnp.exp()
 
   # Train the network!
   for step in range(n_steps):
@@ -1266,7 +1266,8 @@ def train_network(
       validation_loss.append(float(l_validation))
       training_loss.append(float(loss))
 
-      current_sigmas = params['hk_two_output_disentangled_rnn']['choice_net_sigma_params']
+      # Calculate the change in sigmas
+      current_sigmas = jnp.exp(params['hk_two_output_disentangled_rnn']['choice_net_log_sigmas']) # in v 0.20, reparameterize_sigmas is just jnp.exp()
       sigma_change = np.linalg.norm(current_sigmas-last_sigmas)
       last_sigmas = current_sigmas
 
@@ -1274,7 +1275,7 @@ def train_network(
           f'Step {step + 1} of {n_steps}. '
           f'Training Loss: {loss:.2e}. '
           f'Validation Loss: {l_validation:.2e}, '
-          f"Choice sigmas: {params['hk_two_output_disentangled_rnn']['choice_net_sigma_params']}, "
+          f"Choice sigmas: {params['hk_two_output_disentangled_rnn']['choice_net_log_sigmas']}, "
           f"Total sigma change: {sigma_change}"
       )
 
